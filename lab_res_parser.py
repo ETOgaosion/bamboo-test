@@ -5,8 +5,9 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import statistics
 
-PLOT_EACH = True
-PLOT_AVG = True
+PLOT_EACH = False
+PLOT_AVG = False
+PLOT_DEC = True
 
 # valid file
 valid_file = re.compile(r'node_\d+\.log')
@@ -29,13 +30,13 @@ start_prev_stage_exception_parser = re.compile(r'START PrevStageException fallba
 finish_prev_stage_exception_parser = re.compile(r'FINISH PrevStageException fallback schedule (?P<globalstep>\d+)')
 # extract the reconfigure
 start_reconfigure_parser = re.compile(r'START RECONFIGURE (?P<globalstep>\d+)')
-finish_save_shadow_note_parser = re.compile(r'FINISH SAVE SHADOW NODE STATE (?P<globalstep>\d+)')
+finish_save_shadow_node_parser = re.compile(r'FINISH SAVE SHADOW NODE STATE (?P<globalstep>\d+)')
 start_reconfigure_cluster_parser = re.compile(r'START RECONFIGURE CLUSTER and TRANSFER LAYERS (?P<globalstep>\d+)')
 finish_reconfigure_parser = re.compile(r'FINISH RECONFIGURE (?P<globalstep>\d+)')
 
-raw_data_tags = ['start_batch_times', 'finish_batch_times', 'start_local_model_train_times', 'finish_local_model_train_times', 'batch_times', 'start_next_stage_exception_times', 'finish_next_stage_exception_times', 'start_prev_stage_exception_times', 'finish_prev_stage_exception_times', 'start_reconfigure_times', 'finish_save_shadow_note_times', 'start_reconfigure_cluster_times', 'finish_reconfigure_times', 'fail_point']
-mid_data_tags = ['delta_batch_times', 'delta_local_model_train_times', 'delta_next_stage_exception_times', 'delta_prev_stage_exception_times', 'delta_reconfigure_times', 'delta_reconfigure_cluster_times', 'delta_save_shadow_note_times', 'fail_point', 'maxi', 'mini']
-tags = ['delta_local_model_train_time', 'delta_next_stage_exception_time', 'delta_prev_stage_exception_time', 'delta_save_shadow_note_time', 'delta_reconfigure_cluster_time', 'delta_reconfigure_time', 'delta_batch_time']
+raw_data_tags = ['start_batch_times', 'finish_batch_times', 'start_local_model_train_times', 'finish_local_model_train_times', 'batch_times', 'start_next_stage_exception_times', 'finish_next_stage_exception_times', 'start_prev_stage_exception_times', 'finish_prev_stage_exception_times', 'start_reconfigure_times', 'finish_save_shadow_node_times', 'start_reconfigure_cluster_times', 'finish_reconfigure_times', 'fail_point']
+mid_data_tags = ['delta_batch_times', 'delta_local_model_train_times', 'delta_next_stage_exception_times', 'delta_prev_stage_exception_times', 'delta_reconfigure_times', 'delta_reconfigure_cluster_times', 'delta_save_shadow_node_times', 'fail_point', 'maxi']
+tags = ['delta_local_model_train_time', 'delta_next_stage_exception_time', 'delta_prev_stage_exception_time', 'delta_save_shadow_node_time', 'delta_reconfigure_cluster_time', 'delta_reconfigure_time', 'delta_batch_time']
 
 def res_parser(file):
     print(f'processing: {file}')
@@ -51,7 +52,7 @@ def res_parser(file):
         'start_prev_stage_exception_times': {},
         'finish_prev_stage_exception_times': {},
         'start_reconfigure_times': {},
-        'finish_save_shadow_note_times': {},
+        'finish_save_shadow_node_times': {},
         'start_reconfigure_cluster_times': {},
         'finish_reconfigure_times': {}
     }
@@ -114,10 +115,10 @@ def res_parser(file):
                 raw_data['start_reconfigure_times'][globalstep] = dateparser.parse(time.group('time'))
                 append_points.append(globalstep)
                 continue
-            finish_save_shadow_note = finish_save_shadow_note_parser.search(line)
-            if finish_save_shadow_note:
-                globalstep = int(finish_save_shadow_note.group('globalstep'))
-                raw_data['finish_save_shadow_note_times'][globalstep] = dateparser.parse(time.group('time'))
+            finish_save_shadow_node = finish_save_shadow_node_parser.search(line)
+            if finish_save_shadow_node:
+                globalstep = int(finish_save_shadow_node.group('globalstep'))
+                raw_data['finish_save_shadow_node_times'][globalstep] = dateparser.parse(time.group('time'))
                 continue
             start_reconfigure_cluster = start_reconfigure_cluster_parser.search(line)
             if start_reconfigure_cluster:
@@ -129,7 +130,7 @@ def res_parser(file):
                 globalstep = int(finish_reconfigure.group('globalstep'))
                 raw_data['finish_reconfigure_times'][globalstep] = dateparser.parse(time.group('time'))
                 continue
-    assert len(raw_data['start_batch_times']) == len(raw_data['finish_batch_times']) == len(raw_data['batch_times']) == len(raw_data['start_local_model_train_times']) == len(raw_data['finish_local_model_train_times']) and len(raw_data['start_next_stage_exception_times']) == len(raw_data['finish_next_stage_exception_times']) and len(raw_data['start_prev_stage_exception_times']) == len(raw_data['finish_prev_stage_exception_times']) and len(raw_data['start_reconfigure_times']) == len(raw_data['finish_save_shadow_note_times']) == len(raw_data['start_reconfigure_cluster_times']) == len(raw_data['finish_reconfigure_times']), f'{len(raw_data["start_batch_times"])} {len(raw_data["finish_batch_times"])} {len(raw_data["batch_times"])} {len(raw_data["start_local_model_train_times"])} {len(raw_data["finish_local_model_train_times"])} {len(raw_data["start_next_stage_exception_times"])} {len(raw_data["finish_next_stage_exception_times"])} {len(raw_data["start_prev_stage_exception_times"])} {len(raw_data["finish_prev_stage_exception_times"])} {len(raw_data["start_reconfigure_times"])} {len(raw_data["finish_save_shadow_note_times"])} {len(raw_data["start_reconfigure_cluster_times"])} {len(raw_data["finish_reconfigure_times"])}'
+    assert len(raw_data['start_batch_times']) == len(raw_data['finish_batch_times']) == len(raw_data['batch_times']) == len(raw_data['start_local_model_train_times']) == len(raw_data['finish_local_model_train_times']) and len(raw_data['start_next_stage_exception_times']) == len(raw_data['finish_next_stage_exception_times']) and len(raw_data['start_prev_stage_exception_times']) == len(raw_data['finish_prev_stage_exception_times']) and len(raw_data['start_reconfigure_times']) == len(raw_data['finish_save_shadow_node_times']) == len(raw_data['start_reconfigure_cluster_times']) == len(raw_data['finish_reconfigure_times']), f'{len(raw_data["start_batch_times"])} {len(raw_data["finish_batch_times"])} {len(raw_data["batch_times"])} {len(raw_data["start_local_model_train_times"])} {len(raw_data["finish_local_model_train_times"])} {len(raw_data["start_next_stage_exception_times"])} {len(raw_data["finish_next_stage_exception_times"])} {len(raw_data["start_prev_stage_exception_times"])} {len(raw_data["finish_prev_stage_exception_times"])} {len(raw_data["start_reconfigure_times"])} {len(raw_data["finish_save_shadow_node_times"])} {len(raw_data["start_reconfigure_cluster_times"])} {len(raw_data["finish_reconfigure_times"])}'
     assert not ((len(append_points) > 0) & (fail_point != -1)), f'{len(append_points)} {fail_point}'
     return raw_data, append_points, fail_point
 
@@ -144,7 +145,7 @@ def pre_handle_data(raw_data):
         'delta_prev_stage_exception_times': {},
         'delta_reconfigure_times': {},
         'delta_reconfigure_cluster_times': {},
-        'delta_save_shadow_note_times': {}
+        'delta_save_shadow_node_times': {}
     }
     for k, v in raw_data['start_batch_times'].items():
         mid_data['delta_batch_times'][k] = time2int(raw_data['finish_batch_times'][k] - v)
@@ -157,7 +158,7 @@ def pre_handle_data(raw_data):
     for k, v in raw_data['start_reconfigure_times'].items():
         mid_data['delta_reconfigure_times'][k] = time2int(raw_data['finish_reconfigure_times'][k] - v)
         mid_data['delta_reconfigure_cluster_times'][k] = time2int(raw_data['finish_reconfigure_times'][k] - raw_data['start_reconfigure_cluster_times'][k])
-        mid_data['delta_save_shadow_note_times'][k] = time2int(raw_data['finish_save_shadow_note_times'][k] - v)
+        mid_data['delta_save_shadow_node_times'][k] = time2int(raw_data['finish_save_shadow_node_times'][k] - v)
     data = {}
     for k, v in mid_data['delta_batch_times'].items():
         data[k] = {'delta_batch_time': v, 'delta_local_model_train_time': mid_data['delta_local_model_train_times'][k], 'batch_time': raw_data['batch_times'][k]}
@@ -172,8 +173,8 @@ def pre_handle_data(raw_data):
         if k in mid_data['delta_reconfigure_times']:
             data[k]['delta_reconfigure_time'] = mid_data['delta_reconfigure_times'][k] + data[k]['delta_prev_stage_exception_time']
             data[k]['delta_reconfigure_cluster_time'] = mid_data['delta_reconfigure_cluster_times'][k] + data[k]['delta_reconfigure_time']
-            data[k]['delta_save_shadow_note_time'] = mid_data['delta_save_shadow_note_times'][k] + data[k]['delta_reconfigure_cluster_time']
-    return mid_data, data, max(mid_data['delta_batch_times'].values()), min(mid_data['delta_batch_times'].values())
+            data[k]['delta_save_shadow_node_time'] = mid_data['delta_save_shadow_node_times'][k] + data[k]['delta_reconfigure_cluster_time']
+    return mid_data, data, max(mid_data['delta_batch_times'].values())
 
 def handle_data(pre_handled_data, append_points, fail_point):
     data = []
@@ -193,10 +194,17 @@ def handle_data(pre_handled_data, append_points, fail_point):
                 'delta_local_model_train_time': pre_handled_data['delta_local_model_train_times'][point],
                 'delta_reconfigure_time': pre_handled_data['delta_reconfigure_times'][point],
                 'delta_reconfigure_cluster_time': pre_handled_data['delta_reconfigure_cluster_times'][point],
-                'delta_save_shadow_note_time': pre_handled_data['delta_save_shadow_note_times'][point]
+                'delta_save_shadow_node_time': pre_handled_data['delta_save_shadow_node_times'][point]
             })
             last_point = point + 1
             dalta_batch_times, delta_local_model_train_times = [], []
+        for i in range(append_points[-1] + 1, sorted(pre_handled_data['delta_batch_times'].keys())[-1]):
+            dalta_batch_times.append(pre_handled_data['delta_batch_times'][i])
+            delta_local_model_train_times.append(pre_handled_data['delta_local_model_train_times'][i])
+        data.append({
+            'delta_batch_time': statistics.mean(dalta_batch_times),
+            'delta_local_model_train_time': statistics.mean(delta_local_model_train_times)
+        })
     elif fail_point != -1:
         # first normal data
         for i in range(sorted(pre_handled_data['delta_batch_times'].keys())[0], fail_point):
@@ -204,7 +212,7 @@ def handle_data(pre_handled_data, append_points, fail_point):
             delta_local_model_train_times.append(pre_handled_data['delta_local_model_train_times'][i])
         data.append({
             'delta_batch_time': statistics.mean(dalta_batch_times),
-            'delta_local_model_train_time': statistics.mean(dalta_batch_times)
+            'delta_local_model_train_time': statistics.mean(delta_local_model_train_times)
         })
         fail_point = 1
         delta_next_stage_exception_times, delta_prev_stage_exception_times = [], []
@@ -233,71 +241,72 @@ def handle_data(pre_handled_data, append_points, fail_point):
         })
     return data, fail_point
 
-def plot_each(target, data, maxi, mini, fail_point):
+def plot_only(axes, k, v, z_order, c_success, c_fail, fail_point, attach_data):
+    print(f'plotting: {k}, {v}')
+    if fail_point != -1 and k >= fail_point:
+        for i in range(7):
+            if tags[i] in v:
+                bar = axes.bar(k, v[tags[i]], color=c_fail[i], zorder=z_order[i])
+                if attach_data:
+                    if tags[i] == 'delta_batch_time':
+                        axes.bar_label(bar, label_type='edge', padding=3, zorder=99)
+    else:
+        for i in range(7):
+            if tags[i] in v:
+                bar = axes.bar(k, v[tags[i]], color=c_success[i], zorder=z_order[i])
+                if attach_data:
+                    if tags[i] == 'delta_batch_time':
+                        axes.bar_label(bar, label_type='edge', padding=3, zorder=99)
+
+def plot_each(axes, data, maxi, fail_point):
     c_success, c_fail = ['blue', 'violet', 'salmon', 'orange', 'cyan', 'goldenrod', 'magenta'], []
-    zorder, alpha, handles = [], [], []
+    zorder, handles = [], []
     for i in range(7):
         c_fail.append('dark' + c_success[i])
         zorder.append(8 - i)
-        if i != 6:
-            alpha.append(0.6)
-        else:
-            alpha.append(1)
         handles.append(mpatches.Patch(color=c_success[i], label=tags[i]))
         handles.append(mpatches.Patch(color=c_fail[i], label=tags[i] + " fail"))
     for k, v in data.items():
-        if k >= fail_point:
-            for j in range(7):
-                if tags[j] in v:
-                    # print(k, j, v[tags[j]], c_fail[j], zorder[j], alpha[j])
-                    plt.bar(k, v[tags[j]], color=c_fail[j], zorder=zorder[j], alpha=alpha[j])
-        else:
-            for j in range(7):
-                if tags[j] in v:
-                    # print(k, j, v[tags[j]], c_success[j], zorder[j], alpha[j])
-                    plt.bar(k, v[tags[j]], color=c_success[j], zorder=zorder[j], alpha=alpha[j])
-    plt.xlabel('Batch Number')
-    plt.ylim(mini - 200, maxi + 200)
-    plt.ylabel('Execution Time (ms)')
-    plt.legend(handles=handles, fontsize=5)
-    plt.savefig(target)
-    plt.close()
+        plot_only(axes, k, v, zorder, c_success, c_fail, fail_point, False)
+    axes.set_xlabel('Batch Number')
+    axes.set_ylim(0, maxi + 200)
+    axes.set_ylabel('Execution Time (ms)')
+    return handles
 
-def plot_avgs(axes, title, data, maxi, mini, fail_point):
+def plot_avgs(axes, title, data, maxi, fail_point):
     c_success, c_fail = ['blue', 'violet', 'salmon', 'orange', 'cyan', 'goldenrod', 'magenta'], []
-    zorder, alpha, handles = [], [], []
+    zorder, handles = [], []
     for i in range(7):
         c_fail.append('dark' + c_success[i])
         zorder.append(8 - i)
-        if i != 6:
-            alpha.append(0.6)
-        else:
-            alpha.append(1)
         handles.append(mpatches.Patch(color=c_success[i], label=tags[i]))
         handles.append(mpatches.Patch(color=c_fail[i], label=tags[i] + ' fail'))
     ticks = []
     for k, v in enumerate(data):
-        if fail_point != -1 and k >= fail_point:
-            for j in range(7):
-                if tags[j] in v:
-                    # print(k, j, v[tags[j]], tags[j], c_fail[j], zorder[j], alpha[j])
-                    bar = axes.bar(k, v[tags[j]], color=c_fail[j], zorder=zorder[j], alpha=alpha[j])
-                    axes.bar_label(bar, label_type='edge', padding=3, zorder=99)
-        else:
-            for j in range(7):
-                if tags[j] in v:
-                    # print(k, j, v[tags[j]], tags[j], c_success[j], zorder[j], alpha[j])
-                    bar = axes.bar(k, v[tags[j]], color=c_success[j], zorder=zorder[j], alpha=alpha[j])
-                    axes.bar_label(bar, label_type='edge', padding=3, zorder=99)
+        plot_only(axes, k, v, zorder, c_success, c_fail, fail_point, True)
         ticks.append('Stage ' + str(k))
     axes.set_xticks(range(len(data)), ticks)
     axes.set_xlabel('Stage')
-    axes.set_ylim(mini - 200, maxi + 200)
+    axes.set_ylim(0, maxi + 5000)
     axes.set_ylabel('Execution Time (ms)')
     axes.set_title(title)
     return handles
 
-dirs = os.listdir('res')
+def plot_avg_total(axes, idx, data, fail_point):
+    c_success, c_fail = ['blue', 'violet', 'salmon', 'orange', 'cyan', 'goldenrod', 'magenta'], []
+    zorder, handles = [], []
+    for i in range(7):
+        c_fail.append('dark' + c_success[i])
+        zorder.append(8 - i)
+        handles.append(mpatches.Patch(color=c_success[i], label=tags[i]))
+        handles.append(mpatches.Patch(color=c_fail[i], label=tags[i] + ' fail'))
+    for k, v in enumerate(data):
+        plot_only(plt, k + idx * 2, v, zorder, c_success, c_fail, fail_point + idx * 2, True)
+    axes.set_xlabel('Stage')
+    axes.set_ylabel('Execution Time (ms)')
+    return handles
+
+dirs = sorted(os.listdir('res'))
 while '.DS_Store' in dirs: dirs.remove('.DS_Store')
 while '.gitignore' in dirs: dirs.remove('.gitignore')
 
@@ -305,12 +314,14 @@ if PLOT_EACH:
     for diri in dirs:
         files = os.listdir('res/' + diri)
         while '.DS_Store' in files: files.remove('.DS_Store')
+        fig, axes = plt.subplots()
         for item in files:
             raw_data, append_points, fail_point = res_parser('res/' + diri + '/' + item)
-            
             _, data, maxi, mini = pre_handle_data(raw_data)
-            
-            plot_each('fig/' + diri + '/' + item[:-4] + '.png', data, maxi, mini, fail_point)
+            handles = plot_each(axes, data, maxi, mini, fail_point)
+            plt.legend(handles=handles, fontsize=5)
+            plt.savefig('fig/' + diri + '/' + item[:-4] + '.png')
+            plt.close()
 
 if PLOT_AVG:
     for diri in dirs:
@@ -324,13 +335,30 @@ if PLOT_AVG:
         handles = []
         for idx, item in enumerate(files):
             raw_data, append_points, fail_point = res_parser('res/' + diri + '/' + item)
-            
-            mid_data, _, maxi, mini = pre_handle_data(raw_data)
-            
+            mid_data, _, maxi = pre_handle_data(raw_data)
             data, fail_point = handle_data(mid_data, append_points, fail_point)
-            
-            handles = plot_avgs(axes[idx], item, data, maxi, mini, fail_point)
+            handles = plot_avgs(axes[idx], item, data, maxi, fail_point)
         plt.legend(handles=handles, fontsize=10)
         plt.tight_layout(pad=1, w_pad=1, h_pad=2)
         plt.savefig('fig/' + diri + '/nodes.png')
         plt.close()
+
+if PLOT_DEC:
+    dirs.remove('append')
+    fig, axes = plt.subplots()
+    fig.suptitle(f'Decrese Nodes Execution Time')
+    fig.set_size_inches(10, 10)
+    ticks = []
+    maxes = []
+    for idx, diri in enumerate(dirs):
+        raw_data, append_points, fail_point = res_parser('res/' + diri + '/node_1.txt')
+        mid_data, _, maxi = pre_handle_data(raw_data)
+        maxes.append(maxi)
+        data, fail_point = handle_data(mid_data, append_points, fail_point)
+        handles = plot_avg_total(axes, idx, data, fail_point)
+        ticks.extend(['Case ' + str(idx) + ' Stage 0', 'Case ' + str(idx) + ' Stage 1'])
+    axes.set_ylim(0, max(maxes) + 1000)
+    axes.set_xticks(range(2 * len(dirs)), ticks, rotation=-45, fontsize=6)
+    plt.legend(handles=handles, fontsize=4)
+    plt.savefig('fig/dec/nodes.png')
+    plt.close()
