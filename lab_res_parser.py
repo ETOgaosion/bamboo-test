@@ -356,7 +356,7 @@ if PLOT_DEC:
         maxes.append(maxi)
         data, fail_point = handle_data(mid_data, append_points, fail_point)
         handles = plot_avg_total(axes, idx, data, fail_point)
-        ticks.extend(['Case ' + str(idx) + ' Stage 0', 'Case ' + str(idx) + ' Stage 1'])
+        ticks.extend(['Kill Node ' + str(idx + 2) + ' Stage 0', 'Kill Node ' + str(idx + 2) + ' Stage 1'])
     axes.set_ylim(0, max(maxes) + 1000)
     axes.set_xticks(range(2 * len(dirs)), ticks, rotation=-45, fontsize=6)
     plt.legend(handles=handles, fontsize=4)
