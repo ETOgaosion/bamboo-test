@@ -8,6 +8,7 @@ import statistics
 PLOT_EACH = False
 PLOT_AVG = False
 PLOT_DEC = True
+PLOT_LAYER = True
 
 # valid file
 valid_file = re.compile(r'node_\d+\.log')
@@ -33,6 +34,7 @@ start_reconfigure_parser = re.compile(r'START RECONFIGURE (?P<globalstep>\d+)')
 finish_save_shadow_node_parser = re.compile(r'FINISH SAVE SHADOW NODE STATE (?P<globalstep>\d+)')
 start_reconfigure_cluster_parser = re.compile(r'START RECONFIGURE CLUSTER and TRANSFER LAYERS (?P<globalstep>\d+)')
 finish_reconfigure_parser = re.compile(r'FINISH RECONFIGURE (?P<globalstep>\d+)')
+layer_counter_parser = re.compile(r'layer num: (?P<layer>\d+)')
 
 raw_data_tags = ['start_batch_times', 'finish_batch_times', 'start_local_model_train_times', 'finish_local_model_train_times', 'batch_times', 'start_next_stage_exception_times', 'finish_next_stage_exception_times', 'start_prev_stage_exception_times', 'finish_prev_stage_exception_times', 'start_reconfigure_times', 'finish_save_shadow_node_times', 'start_reconfigure_cluster_times', 'finish_reconfigure_times', 'fail_point']
 mid_data_tags = ['delta_batch_times', 'delta_local_model_train_times', 'delta_next_stage_exception_times', 'delta_prev_stage_exception_times', 'delta_reconfigure_times', 'delta_reconfigure_cluster_times', 'delta_save_shadow_node_times', 'fail_point', 'maxi']
@@ -40,7 +42,6 @@ tags = ['delta_local_model_train_time', 'delta_next_stage_exception_time', 'delt
 
 def res_parser(file):
     print(f'processing: {file}')
-    print
     raw_data = {
         'start_batch_times': {},
         'finish_batch_times': {},
@@ -60,7 +61,7 @@ def res_parser(file):
     fail_point = -1
     with open(file, 'r') as fp:
         for line in fp.readlines():
-            if fail_point == -1 and (failure_node_detect_parser.match(line) or failure_detect_parser.search(line)):
+            if fail_point == -1 and (failure_detect_parser.search(line)):
                 fail_point = len(raw_data['start_batch_times'])
             if is_log_parser.match(line) is None:
                 continue
@@ -133,6 +134,31 @@ def res_parser(file):
     assert len(raw_data['start_batch_times']) == len(raw_data['finish_batch_times']) == len(raw_data['batch_times']) == len(raw_data['start_local_model_train_times']) == len(raw_data['finish_local_model_train_times']) and len(raw_data['start_next_stage_exception_times']) == len(raw_data['finish_next_stage_exception_times']) and len(raw_data['start_prev_stage_exception_times']) == len(raw_data['finish_prev_stage_exception_times']) and len(raw_data['start_reconfigure_times']) == len(raw_data['finish_save_shadow_node_times']) == len(raw_data['start_reconfigure_cluster_times']) == len(raw_data['finish_reconfigure_times']), f'{len(raw_data["start_batch_times"])} {len(raw_data["finish_batch_times"])} {len(raw_data["batch_times"])} {len(raw_data["start_local_model_train_times"])} {len(raw_data["finish_local_model_train_times"])} {len(raw_data["start_next_stage_exception_times"])} {len(raw_data["finish_next_stage_exception_times"])} {len(raw_data["start_prev_stage_exception_times"])} {len(raw_data["finish_prev_stage_exception_times"])} {len(raw_data["start_reconfigure_times"])} {len(raw_data["finish_save_shadow_node_times"])} {len(raw_data["start_reconfigure_cluster_times"])} {len(raw_data["finish_reconfigure_times"])}'
     assert not ((len(append_points) > 0) & (fail_point != -1)), f'{len(append_points)} {fail_point}'
     return raw_data, append_points, fail_point
+
+def last_node_find(file):
+    print(f'processing: {file}')
+    append_points = []
+    fail_point = -1
+    with open(file, 'r') as fp:
+        for line in fp.readlines():
+            start_next_stage_exception = start_next_stage_exception_parser.search(line)
+            if start_next_stage_exception:
+                return True
+            # start_prev_stage_exception = start_prev_stage_exception_parser.search(line)
+            # if start_prev_stage_exception:
+            #     return True
+    return False
+
+def layer_count(file):
+    print(f'processing: {file}')
+    layer = 0
+    with open(file, 'r') as fp:
+        for line in fp.readlines():
+            layer_count = layer_counter_parser.search(line)
+            if layer_count:
+                layer = int(layer_count.group('layer'))
+                break
+    return layer
 
 def time2int(td):
     return td.total_seconds() * 1000
@@ -214,7 +240,7 @@ def handle_data(pre_handled_data, append_points, fail_point):
             'delta_batch_time': statistics.mean(dalta_batch_times),
             'delta_local_model_train_time': statistics.mean(delta_local_model_train_times)
         })
-        fail_point = 1
+        dalta_batch_times, delta_local_model_train_times = [], []
         delta_next_stage_exception_times, delta_prev_stage_exception_times = [], []
         for i in range(fail_point, len(pre_handled_data['delta_batch_times'])):
             dalta_batch_times.append(pre_handled_data['delta_batch_times'][i])
@@ -231,6 +257,7 @@ def handle_data(pre_handled_data, append_points, fail_point):
             data[-1]['delta_next_stage_exception_time'] = statistics.mean(delta_next_stage_exception_times)
         if delta_prev_stage_exception_times:
             data[-1]['delta_prev_stage_exception_time'] = statistics.mean(delta_prev_stage_exception_times)
+        fail_point = 1
     else:
         for i in sorted(pre_handled_data['delta_batch_times'].keys()):
             dalta_batch_times.append(pre_handled_data['delta_batch_times'][i])
@@ -242,10 +269,10 @@ def handle_data(pre_handled_data, append_points, fail_point):
     return data, fail_point
 
 def plot_only(axes, k, v, z_order, c_success, c_fail, fail_point, attach_data):
-    print(f'plotting: {k}, {v}')
     if fail_point != -1 and k >= fail_point:
         for i in range(7):
             if tags[i] in v:
+                # print(f'{k}, {v[tags[i]]}, tags[i]: {tags[i]} color={c_fail[i]}, zorder={z_order[i]}')
                 bar = axes.bar(k, v[tags[i]], color=c_fail[i], zorder=z_order[i])
                 if attach_data:
                     if tags[i] == 'delta_batch_time':
@@ -253,13 +280,14 @@ def plot_only(axes, k, v, z_order, c_success, c_fail, fail_point, attach_data):
     else:
         for i in range(7):
             if tags[i] in v:
+                # print(f'{k}, {v[tags[i]]}, tags[i]: {tags[i]} color={c_success[i]}, zorder={z_order[i]}')
                 bar = axes.bar(k, v[tags[i]], color=c_success[i], zorder=z_order[i])
                 if attach_data:
                     if tags[i] == 'delta_batch_time':
                         axes.bar_label(bar, label_type='edge', padding=3, zorder=99)
 
 def plot_each(axes, data, maxi, fail_point):
-    c_success, c_fail = ['blue', 'violet', 'salmon', 'orange', 'cyan', 'goldenrod', 'magenta'], []
+    c_success, c_fail = ['blue', 'salmon', 'green', 'orange', 'cyan', 'goldenrod', 'magenta'], []
     zorder, handles = [], []
     for i in range(7):
         c_fail.append('dark' + c_success[i])
@@ -274,7 +302,7 @@ def plot_each(axes, data, maxi, fail_point):
     return handles
 
 def plot_avgs(axes, title, data, maxi, fail_point):
-    c_success, c_fail = ['blue', 'violet', 'salmon', 'orange', 'cyan', 'goldenrod', 'magenta'], []
+    c_success, c_fail = ['blue', 'salmon', 'green', 'orange', 'cyan', 'goldenrod', 'magenta'], []
     zorder, handles = [], []
     for i in range(7):
         c_fail.append('dark' + c_success[i])
@@ -293,7 +321,7 @@ def plot_avgs(axes, title, data, maxi, fail_point):
     return handles
 
 def plot_avg_total(axes, idx, data, fail_point):
-    c_success, c_fail = ['blue', 'violet', 'salmon', 'orange', 'cyan', 'goldenrod', 'magenta'], []
+    c_success, c_fail = ['blue', 'salmon', 'green', 'orange', 'cyan', 'goldenrod', 'magenta'], []
     zorder, handles = [], []
     for i in range(7):
         c_fail.append('dark' + c_success[i])
@@ -301,7 +329,7 @@ def plot_avg_total(axes, idx, data, fail_point):
         handles.append(mpatches.Patch(color=c_success[i], label=tags[i]))
         handles.append(mpatches.Patch(color=c_fail[i], label=tags[i] + ' fail'))
     for k, v in enumerate(data):
-        plot_only(plt, k + idx * 2, v, zorder, c_success, c_fail, fail_point + idx * 2, True)
+        plot_only(plt, k + idx * 2, v, zorder, c_success, c_fail, -1 if fail_point == -1 else fail_point + idx * 2, True)
     axes.set_xlabel('Stage')
     axes.set_ylabel('Execution Time (ms)')
     return handles
@@ -317,8 +345,8 @@ if PLOT_EACH:
         fig, axes = plt.subplots()
         for item in files:
             raw_data, append_points, fail_point = res_parser('res/' + diri + '/' + item)
-            _, data, maxi, mini = pre_handle_data(raw_data)
-            handles = plot_each(axes, data, maxi, mini, fail_point)
+            _, data, maxi = pre_handle_data(raw_data)
+            handles = plot_each(axes, data, maxi, fail_point)
             plt.legend(handles=handles, fontsize=5)
             plt.savefig('fig/' + diri + '/' + item[:-4] + '.png')
             plt.close()
@@ -338,27 +366,61 @@ if PLOT_AVG:
             mid_data, _, maxi = pre_handle_data(raw_data)
             data, fail_point = handle_data(mid_data, append_points, fail_point)
             handles = plot_avgs(axes[idx], item, data, maxi, fail_point)
-        plt.legend(handles=handles, fontsize=10)
+        plt.legend(handles=handles, fontsize=10, bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
         plt.tight_layout(pad=1, w_pad=1, h_pad=2)
         plt.savefig('fig/' + diri + '/nodes.png')
         plt.close()
 
 if PLOT_DEC:
-    dirs.remove('append')
+    if 'append' in dirs:
+        dirs.remove('append')
     fig, axes = plt.subplots()
-    fig.suptitle(f'Decrese Nodes Execution Time')
+    fig.suptitle(f'Decrease Nodes Execution Time')
     fig.set_size_inches(10, 10)
     ticks = []
     maxes = []
     for idx, diri in enumerate(dirs):
-        raw_data, append_points, fail_point = res_parser('res/' + diri + '/node_1.txt')
-        mid_data, _, maxi = pre_handle_data(raw_data)
-        maxes.append(maxi)
-        data, fail_point = handle_data(mid_data, append_points, fail_point)
-        handles = plot_avg_total(axes, idx, data, fail_point)
-        ticks.extend(['Kill Node ' + str(idx + 2) + ' Stage 0', 'Kill Node ' + str(idx + 2) + ' Stage 1'])
+        files = os.listdir('res/' + diri)
+        while '.DS_Store' in files: files.remove('.DS_Store')
+        while '.gitignore' in files: files.remove('.gitignore')
+        files = sorted(files)
+        for item in files:
+            if last_node_find('res/' + diri + '/' + item):
+                print('found node: ' + 'res/' + diri + '/' + item)
+                raw_data, append_points, fail_point = res_parser('res/' + diri + '/' + item)
+                mid_data, _, maxi = pre_handle_data(raw_data)
+                maxes.append(maxi)
+                data, fail_point = handle_data(mid_data, append_points, fail_point)
+                handles = plot_avg_total(axes, idx, data, fail_point)
+                ticks.extend(['Kill Node ' + diri[4] + ' Normal Run', 'Kill Node ' + diri[4] + ' After Kill'])
     axes.set_ylim(0, max(maxes) + 1000)
-    axes.set_xticks(range(2 * len(dirs)), ticks, rotation=-45, fontsize=6)
-    plt.legend(handles=handles, fontsize=4)
+    axes.set_xticks(range(len(ticks)), ticks, rotation=-45, fontsize=6)
+    plt.legend(handles=handles, fontsize=8)
     plt.savefig('fig/dec/nodes.png')
     plt.close()
+
+if PLOT_LAYER:
+    if 'append' in dirs:
+        dirs.remove('append')
+    for idx, diri in enumerate(dirs):
+        files = os.listdir('res/' + diri)
+        while '.DS_Store' in files: files.remove('.DS_Store')
+        while '.gitignore' in files: files.remove('.gitignore')
+        files = sorted(files)
+        fig, axes = plt.subplots()
+        fig.suptitle(f'Layers Count')
+        fig.set_size_inches(2 * len(files), 10)
+        ticks = []
+        maxes = []
+        for idx, item in enumerate(files):
+            layers = layer_count('res/' + diri + '/' + item)
+            maxes.append(layers)
+            bar = axes.bar(idx, layers, color='blue', width=0.4)
+            axes.bar_label(bar, label_type='edge', padding=3, zorder=99)
+            ticks.append('Node ' + str(idx))
+        axes.set_ylim(0, max(maxes) + 5)
+        axes.set_ylabel('Layer Count')
+        axes.set_xticks(range(len(ticks)), ticks, rotation=-45, fontsize=6)
+        axes.set_xlabel('Node Number')
+        plt.savefig('fig/' + diri + '/layers.png')
+        plt.close()
