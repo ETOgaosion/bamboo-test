@@ -4,11 +4,17 @@ from dateutil import parser as dateparser
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import statistics
+import statsmodels.api as sm
+import numpy as np
+from itertools import chain
 
 PLOT_EACH = False
 PLOT_AVG = False
-PLOT_DEC = True
-PLOT_LAYER = True
+PLOT_DEC = False
+PLOT_LAYER = False
+CALCULATE_RDZV = False
+CALCULATE_FALLBACK = True
+CALCULATE_PIPELINE_DELTA = False
 
 # valid file
 valid_file = re.compile(r'node_\d+\.log')
@@ -38,7 +44,7 @@ layer_counter_parser = re.compile(r'layer num: (?P<layer>\d+)')
 
 raw_data_tags = ['start_batch_times', 'finish_batch_times', 'start_local_model_train_times', 'finish_local_model_train_times', 'batch_times', 'start_next_stage_exception_times', 'finish_next_stage_exception_times', 'start_prev_stage_exception_times', 'finish_prev_stage_exception_times', 'start_reconfigure_times', 'finish_save_shadow_node_times', 'start_reconfigure_cluster_times', 'finish_reconfigure_times', 'fail_point']
 mid_data_tags = ['delta_batch_times', 'delta_local_model_train_times', 'delta_next_stage_exception_times', 'delta_prev_stage_exception_times', 'delta_reconfigure_times', 'delta_reconfigure_cluster_times', 'delta_save_shadow_node_times', 'fail_point', 'maxi']
-tags = ['delta_local_model_train_time', 'delta_next_stage_exception_time', 'delta_prev_stage_exception_time', 'delta_save_shadow_node_time', 'delta_reconfigure_cluster_time', 'delta_reconfigure_time', 'delta_batch_time']
+tags = ['delta_local_model_train_time', 'delta_next_stage_exception_time', 'delta_prev_stage_exception_time', 'delta_save_shadow_node_time', 'delta_reconfigure_time', 'delta_reconfigure_cluster_time', 'delta_batch_time']
 
 def res_parser(file):
     print(f'processing: {file}')
@@ -197,9 +203,9 @@ def pre_handle_data(raw_data):
         else:
             data[k]['delta_prev_stage_exception_time'] = data[k]['delta_next_stage_exception_time']
         if k in mid_data['delta_reconfigure_times']:
-            data[k]['delta_reconfigure_time'] = mid_data['delta_reconfigure_times'][k] + data[k]['delta_prev_stage_exception_time']
-            data[k]['delta_reconfigure_cluster_time'] = mid_data['delta_reconfigure_cluster_times'][k] + data[k]['delta_reconfigure_time']
-            data[k]['delta_save_shadow_node_time'] = mid_data['delta_save_shadow_node_times'][k] + data[k]['delta_reconfigure_cluster_time']
+            data[k]['delta_save_shadow_node_time'] = mid_data['delta_save_shadow_node_times'][k] + data[k]['delta_prev_stage_exception_time']
+            data[k]['delta_reconfigure_time'] = mid_data['delta_reconfigure_times'][k] - mid_data['delta_reconfigure_cluster_times'][k] + data[k]['delta_save_shadow_node_time']
+            data[k]['delta_reconfigure_cluster_time'] = mid_data['delta_reconfigure_times'][k] + data[k]['delta_prev_stage_exception_time']
     return mid_data, data, max(mid_data['delta_batch_times'].values())
 
 def handle_data(pre_handled_data, append_points, fail_point):
@@ -424,3 +430,139 @@ if PLOT_LAYER:
         axes.set_xlabel('Node Number')
         plt.savefig('fig/' + diri + '/layers.png')
         plt.close()
+
+'''
+y = x1 * x + const
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:                      y   R-squared:                       1.000
+Model:                            OLS   Adj. R-squared:                  0.999
+Method:                 Least Squares   F-statistic:                     9931.
+Date:                Thu, 11 Apr 2024   Prob (F-statistic):           6.08e-08
+Time:                        12:08:45   Log-Likelihood:                -36.047
+No. Observations:                   6   AIC:                             76.09
+Df Residuals:                       4   BIC:                             75.68
+Df Model:                           1                                         
+Covariance Type:            nonrobust                                         
+==============================================================================
+                 coef    std err          t      P>|t|      [0.025      0.975]
+------------------------------------------------------------------------------
+const       7.563e+04    130.157    581.089      0.000    7.53e+04     7.6e+04
+x1          6004.3633     60.251     99.656      0.000    5837.080    6171.646
+==============================================================================
+Omnibus:                          nan   Durbin-Watson:                   2.368
+Prob(Omnibus):                    nan   Jarque-Bera (JB):                0.953
+Skew:                           0.965   Prob(JB):                        0.621
+Kurtosis:                       2.705   Cond. No.                         6.79
+==============================================================================
+'''
+if CALCULATE_RDZV:
+    x = np.repeat(np.arange(1, 4), 2)
+    raw_data, append_points, fail_point = res_parser('res_raw/append/node_0.txt')
+    mid_data, _, _ = pre_handle_data(raw_data)
+    y = np.asarray(list(mid_data['delta_reconfigure_times'].values()), dtype=np.float32)
+    raw_data, append_points, fail_point = res_parser('res_raw/append/node_1.txt')
+    mid_data, _, _ = pre_handle_data(raw_data)
+    y = np.array(list(chain.from_iterable(zip(y, np.asarray(list(mid_data['delta_reconfigure_times'].values()), dtype=np.float32)))))
+    x = sm.add_constant(x)
+    print(x, y)
+    model = sm.OLS(y, x, hasconst=1)
+    results = model.fit()
+    print(results.summary())
+
+'''
+y = x1 / x + 1 (not so ideal)
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:                      y   R-squared:                       0.356
+Model:                            OLS   Adj. R-squared:                  0.356
+Method:                 Least Squares   F-statistic:                       nan
+Date:                Thu, 11 Apr 2024   Prob (F-statistic):                nan
+Time:                        17:45:51   Log-Likelihood:                 6.6699
+No. Observations:                   6   AIC:                            -11.34
+Df Residuals:                       5   BIC:                            -11.55
+Df Model:                           0                                         
+Covariance Type:            nonrobust                                         
+==============================================================================
+                 coef    std err          t      P>|t|      [0.025      0.975]
+------------------------------------------------------------------------------
+x1             2.4297      0.163     14.868      0.000       2.010       2.850
+==============================================================================
+Omnibus:                          nan   Durbin-Watson:                   0.598
+Prob(Omnibus):                    nan   Jarque-Bera (JB):                0.603
+Skew:                          -0.478   Prob(JB):                        0.740
+Kurtosis:                       1.776   Cond. No.                         1.00
+==============================================================================
+'''
+if CALCULATE_FALLBACK:
+    if 'append' in dirs:
+        dirs.remove('append')
+    dataset = []
+    for idx, diri in enumerate(dirs):
+        files = os.listdir('res/' + diri)
+        while '.DS_Store' in files: files.remove('.DS_Store')
+        while '.gitignore' in files: files.remove('.gitignore')
+        files = sorted(files)
+        for item in files:
+            if last_node_find('res/' + diri + '/' + item):
+                print('found node: ' + 'res/' + diri + '/' + item)
+                raw_data, append_points, fail_point = res_parser('res/' + diri + '/' + item)
+                mid_data, _, _ = pre_handle_data(raw_data)
+                data, fail_point = handle_data(mid_data, append_points, fail_point)
+                for item in data:
+                    dataset.append(item)
+    data = dataset[-2:]
+    dataset = dataset[:10]
+    dataset.extend(data)
+    x = np.array([3, 4, 5, 6, 6, 8])
+    x = np.ones(x.shape) / x
+    y = np.array([dataset[i + 1]['delta_batch_time']/dataset[i]['delta_batch_time'] for i in range(0, len(dataset), 2)])
+    y = y - np.ones(y.shape)
+    # y = np.ones(y.shape)/y
+    print(x, y)
+    model = sm.OLS(y, x, hasconst=1)
+    results = model.fit()
+    print(results.summary())
+    # f, residuals, rank, singular_values, rcond = np.polyfit(x, y, 2, full=True)
+    # print(f, residuals, rank, singular_values, rcond)
+
+'''
+y(accelerate rate) = x1 / x + 1
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:                      y   R-squared:                       0.958
+Model:                            OLS   Adj. R-squared:                  0.958
+Method:                 Least Squares   F-statistic:                       nan
+Date:                Thu, 11 Apr 2024   Prob (F-statistic):                nan
+Time:                        13:48:21   Log-Likelihood:                 9.5274
+No. Observations:                   6   AIC:                            -17.05
+Df Residuals:                       5   BIC:                            -17.26
+Df Model:                           0                                         
+Covariance Type:            nonrobust                                         
+==============================================================================
+                 coef    std err          t      P>|t|      [0.025      0.975]
+------------------------------------------------------------------------------
+x1             0.6891      0.033     20.989      0.000       0.605       0.773
+==============================================================================
+Omnibus:                          nan   Durbin-Watson:                   0.491
+Prob(Omnibus):                    nan   Jarque-Bera (JB):                0.893
+Skew:                           0.575   Prob(JB):                        0.640
+Kurtosis:                       1.500   Cond. No.                         1.00
+==============================================================================
+'''
+if CALCULATE_PIPELINE_DELTA:
+    x = np.repeat(np.arange(1, 4), 2)
+    x = np.ones(x.shape) / x
+    raw_data, append_points, fail_point = res_parser('res_raw/append/node_0.txt')
+    mid_data, _, _ = pre_handle_data(raw_data)
+    data, fail_point = handle_data(mid_data, append_points, fail_point)
+    y = np.asarray([data[i]['delta_batch_time'] / data[i + 2]['delta_batch_time'] for i in range(0, 6, 2)], dtype=np.float32)
+    raw_data, append_points, fail_point = res_parser('res_raw/append/node_1.txt')
+    mid_data, _, _ = pre_handle_data(raw_data)
+    data, fail_point = handle_data(mid_data, append_points, fail_point)
+    y = np.array(list(chain.from_iterable(zip(y, np.asarray([data[i]['delta_batch_time'] / data[i + 2]['delta_batch_time'] for i in range(0, 6, 2)], dtype=np.float32)))))
+    y = y - np.ones(y.shape)
+    print(x, y)
+    model = sm.OLS(y, x, hasconst=1)
+    results = model.fit()
+    print(results.summary())
