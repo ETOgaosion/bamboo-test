@@ -8,14 +8,6 @@ import statsmodels.api as sm
 import numpy as np
 from itertools import chain
 
-PLOT_EACH = False
-PLOT_AVG = False
-PLOT_DEC = False
-PLOT_LAYER = False
-CALCULATE_RDZV = False
-CALCULATE_FALLBACK = True
-CALCULATE_PIPELINE_DELTA = False
-
 # valid file
 valid_file = re.compile(r'node_\d+\.log')
 # judge the log line
@@ -23,30 +15,33 @@ is_log_parser = re.compile(r'\[ \d{2,}\|\d{2,} \]')
 # extract the time
 time_parser = re.compile(r'(?P<time>\d{4,}-\d{2,}-\d{2,} \d{2,}:\d{2,}:\d{2,}.\d+)')
 # extract the batch operation
-start_batch_parser = re.compile(r'START BATCH (?P<batchid>\d+)')
-finish_batch_parser = re.compile(r'FINISH BATCH (?P<batchid>\d+) took (?P<batchtime>\S+) s')
-start_local_model_train_parser = re.compile(r'START LOCAL MODEL TRAIN (?P<globalstep>\d+)')
-finish_local_model_train_parser = re.compile(r'FINISH LOCAL MODEL TRAIN (?P<globalstep>\d+)')
-failure_node_detect_parser = re.compile(r'\[Engine\] Signal handler called with signal 15')
+start_batch_parser                  = re.compile(r'START BATCH (?P<batchid>\d+)')
+finish_batch_parser                 = re.compile(r'FINISH BATCH (?P<batchid>\d+) took (?P<batchtime>\S+) s')
+start_local_model_train_parser      = re.compile(r'START LOCAL MODEL TRAIN (?P<globalstep>\d+)')
+finish_local_model_train_parser     = re.compile(r'FINISH LOCAL MODEL TRAIN (?P<globalstep>\d+)')
+failure_node_detect_parser          = re.compile(r'\[Engine\] Signal handler called with signal 15')
 # extract the failure
-failure_detect_parser = re.compile(r'FAILURES')
+failure_detect_parser               = re.compile(r'FAILURES')
 # extract the exception
-start_next_stage_exception_parser = re.compile(r'START NextStageException fallback schedule (?P<globalstep>\d+)')
-finish_next_stage_exception_parser = re.compile(r'FINISH NextStageException fallback schedule (?P<globalstep>\d+)')
-start_prev_stage_exception_parser = re.compile(r'START PrevStageException fallback schedule (?P<globalstep>\d+)')
-finish_prev_stage_exception_parser = re.compile(r'FINISH PrevStageException fallback schedule (?P<globalstep>\d+)')
+start_next_stage_exception_parser   = re.compile(r'START NextStageException fallback schedule (?P<globalstep>\d+)')
+finish_next_stage_exception_parser  = re.compile(r'FINISH NextStageException fallback schedule (?P<globalstep>\d+)')
+start_prev_stage_exception_parser   = re.compile(r'START PrevStageException fallback schedule (?P<globalstep>\d+)')
+finish_prev_stage_exception_parser  = re.compile(r'FINISH PrevStageException fallback schedule (?P<globalstep>\d+)')
 # extract the reconfigure
-start_reconfigure_parser = re.compile(r'START RECONFIGURE (?P<globalstep>\d+)')
-finish_save_shadow_node_parser = re.compile(r'FINISH SAVE SHADOW NODE STATE (?P<globalstep>\d+)')
-start_reconfigure_cluster_parser = re.compile(r'START RECONFIGURE CLUSTER and TRANSFER LAYERS (?P<globalstep>\d+)')
-finish_reconfigure_parser = re.compile(r'FINISH RECONFIGURE (?P<globalstep>\d+)')
-layer_counter_parser = re.compile(r'layer num: (?P<layer>\d+)')
+start_reconfigure_parser            = re.compile(r'START RECONFIGURE (?P<globalstep>\d+)')
+finish_save_shadow_node_parser      = re.compile(r'FINISH SAVE SHADOW NODE STATE (?P<globalstep>\d+)')
+start_reconfigure_cluster_parser    = re.compile(r'START RECONFIGURE CLUSTER and TRANSFER LAYERS (?P<globalstep>\d+)')
+finish_reconfigure_parser           = re.compile(r'FINISH RECONFIGURE (?P<globalstep>\d+)')
+layer_counter_parser                = re.compile(r'layer num: (?P<layer>\d+)')
 
 raw_data_tags = ['start_batch_times', 'finish_batch_times', 'start_local_model_train_times', 'finish_local_model_train_times', 'batch_times', 'start_next_stage_exception_times', 'finish_next_stage_exception_times', 'start_prev_stage_exception_times', 'finish_prev_stage_exception_times', 'start_reconfigure_times', 'finish_save_shadow_node_times', 'start_reconfigure_cluster_times', 'finish_reconfigure_times', 'fail_point']
 mid_data_tags = ['delta_batch_times', 'delta_local_model_train_times', 'delta_next_stage_exception_times', 'delta_prev_stage_exception_times', 'delta_reconfigure_times', 'delta_reconfigure_cluster_times', 'delta_save_shadow_node_times', 'fail_point', 'maxi']
 tags = ['delta_local_model_train_time', 'delta_next_stage_exception_time', 'delta_prev_stage_exception_time', 'delta_save_shadow_node_time', 'delta_reconfigure_time', 'delta_reconfigure_cluster_time', 'delta_batch_time']
 
+base_dir = 'test/bambootest/'
+
 def res_parser(file):
+    file = base_dir + file
     print(f'processing: {file}')
     raw_data = {
         'start_batch_times': {},
@@ -142,6 +137,7 @@ def res_parser(file):
     return raw_data, append_points, fail_point
 
 def last_node_find(file):
+    file = base_dir + file
     print(f'processing: {file}')
     append_points = []
     fail_point = -1
@@ -156,6 +152,7 @@ def last_node_find(file):
     return False
 
 def layer_count(file):
+    file = base_dir + file
     print(f'processing: {file}')
     layer = 0
     with open(file, 'r') as fp:
@@ -274,6 +271,13 @@ def handle_data(pre_handled_data, append_points, fail_point):
         })
     return data, fail_point
 
+def save_figure(path):
+    plt.savefig(base_dir + path)
+    plt.close()
+    
+def ls(path):
+    return os.listdir(base_dir + path)
+
 def plot_only(axes, k, v, z_order, c_success, c_fail, fail_point, attach_data):
     if fail_point != -1 and k >= fail_point:
         for i in range(7):
@@ -340,13 +344,9 @@ def plot_avg_total(axes, idx, data, fail_point):
     axes.set_ylabel('Execution Time (ms)')
     return handles
 
-dirs = sorted(os.listdir('res'))
-while '.DS_Store' in dirs: dirs.remove('.DS_Store')
-while '.gitignore' in dirs: dirs.remove('.gitignore')
-
-if PLOT_EACH:
+def plot_each_main(dirs):
     for diri in dirs:
-        files = os.listdir('res/' + diri)
+        files = ls('res/' + diri)
         while '.DS_Store' in files: files.remove('.DS_Store')
         fig, axes = plt.subplots()
         for item in files:
@@ -357,9 +357,10 @@ if PLOT_EACH:
             plt.savefig('fig/' + diri + '/' + item[:-4] + '.png')
             plt.close()
 
-if PLOT_AVG:
+
+def plot_avg_main(dirs):
     for diri in dirs:
-        files = os.listdir('res/' + diri)
+        files = ls('res/' + diri)
         while '.DS_Store' in files: files.remove('.DS_Store')
         while '.gitignore' in files: files.remove('.gitignore')
         files = sorted(files)
@@ -374,10 +375,10 @@ if PLOT_AVG:
             handles = plot_avgs(axes[idx], item, data, maxi, fail_point)
         plt.legend(handles=handles, fontsize=10, bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
         plt.tight_layout(pad=1, w_pad=1, h_pad=2)
-        plt.savefig('fig/' + diri + '/nodes.png')
-        plt.close()
+        save_figure('fig/' + diri + '/nodes.png')
 
-if PLOT_DEC:
+
+def plot_dec_main(dirs):
     if 'append' in dirs:
         dirs.remove('append')
     fig, axes = plt.subplots()
@@ -386,7 +387,7 @@ if PLOT_DEC:
     ticks = []
     maxes = []
     for idx, diri in enumerate(dirs):
-        files = os.listdir('res/' + diri)
+        files = ls('res/' + diri)
         while '.DS_Store' in files: files.remove('.DS_Store')
         while '.gitignore' in files: files.remove('.gitignore')
         files = sorted(files)
@@ -402,14 +403,14 @@ if PLOT_DEC:
     axes.set_ylim(0, max(maxes) + 1000)
     axes.set_xticks(range(len(ticks)), ticks, rotation=-45, fontsize=6)
     plt.legend(handles=handles, fontsize=8)
-    plt.savefig('fig/dec/nodes.png')
-    plt.close()
+    save_figure('fig/dec/nodes.png')
 
-if PLOT_LAYER:
+
+def plot_layer_main(dirs):
     if 'append' in dirs:
         dirs.remove('append')
     for idx, diri in enumerate(dirs):
-        files = os.listdir('res/' + diri)
+        files = ls('res/' + diri)
         while '.DS_Store' in files: files.remove('.DS_Store')
         while '.gitignore' in files: files.remove('.gitignore')
         files = sorted(files)
@@ -428,8 +429,8 @@ if PLOT_LAYER:
         axes.set_ylabel('Layer Count')
         axes.set_xticks(range(len(ticks)), ticks, rotation=-45, fontsize=6)
         axes.set_xlabel('Node Number')
-        plt.savefig('fig/' + diri + '/layers.png')
-        plt.close()
+        save_figure('fig/' + diri + '/layers.png')
+
 
 '''
 y = x1 * x + const
@@ -456,7 +457,7 @@ Skew:                           0.965   Prob(JB):                        0.621
 Kurtosis:                       2.705   Cond. No.                         6.79
 ==============================================================================
 '''
-if CALCULATE_RDZV:
+def calculate_rdzv_main():
     x = np.repeat(np.arange(1, 4), 2)
     raw_data, append_points, fail_point = res_parser('res_raw/append/node_0.txt')
     mid_data, _, _ = pre_handle_data(raw_data)
@@ -469,6 +470,7 @@ if CALCULATE_RDZV:
     model = sm.OLS(y, x, hasconst=1)
     results = model.fit()
     print(results.summary())
+    return results
 
 '''
 y = x1 / x + 1 (not so ideal)
@@ -494,12 +496,12 @@ Skew:                          -0.478   Prob(JB):                        0.740
 Kurtosis:                       1.776   Cond. No.                         1.00
 ==============================================================================
 '''
-if CALCULATE_FALLBACK:
+def calculate_fallback_main(dirs):
     if 'append' in dirs:
         dirs.remove('append')
     dataset = []
     for idx, diri in enumerate(dirs):
-        files = os.listdir('res/' + diri)
+        files = ls('res/' + diri)
         while '.DS_Store' in files: files.remove('.DS_Store')
         while '.gitignore' in files: files.remove('.gitignore')
         files = sorted(files)
@@ -520,11 +522,13 @@ if CALCULATE_FALLBACK:
     y = y - np.ones(y.shape)
     # y = np.ones(y.shape)/y
     print(x, y)
-    model = sm.OLS(y, x, hasconst=1)
+    model = sm.OLS(y, x)
     results = model.fit()
     print(results.summary())
     # f, residuals, rank, singular_values, rcond = np.polyfit(x, y, 2, full=True)
     # print(f, residuals, rank, singular_values, rcond)
+    return results
+
 
 '''
 y(accelerate rate) = x1 / x + 1
@@ -550,7 +554,7 @@ Skew:                           0.575   Prob(JB):                        0.640
 Kurtosis:                       1.500   Cond. No.                         1.00
 ==============================================================================
 '''
-if CALCULATE_PIPELINE_DELTA:
+def calculate_pipeline_delta():
     x = np.repeat(np.arange(1, 4), 2)
     x = np.ones(x.shape) / x
     raw_data, append_points, fail_point = res_parser('res_raw/append/node_0.txt')
@@ -563,6 +567,7 @@ if CALCULATE_PIPELINE_DELTA:
     y = np.array(list(chain.from_iterable(zip(y, np.asarray([data[i]['delta_batch_time'] / data[i + 2]['delta_batch_time'] for i in range(0, 6, 2)], dtype=np.float32)))))
     y = y - np.ones(y.shape)
     print(x, y)
-    model = sm.OLS(y, x, hasconst=1)
+    model = sm.OLS(y, x)
     results = model.fit()
     print(results.summary())
+    return results
