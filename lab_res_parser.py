@@ -571,3 +571,10 @@ def calculate_pipeline_delta():
     results = model.fit()
     print(results.summary())
     return results
+
+def res_parser_init():
+    global base_dir
+    dirs = sorted(os.listdir(base_dir + 'res'))
+    while '.DS_Store' in dirs: dirs.remove('.DS_Store')
+    while '.gitignore' in dirs: dirs.remove('.gitignore')
+    return calculate_rdzv_main(), calculate_fallback_main(dirs), calculate_pipeline_delta()
