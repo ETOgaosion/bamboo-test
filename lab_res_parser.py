@@ -185,8 +185,10 @@ def pre_handle_data(raw_data):
     for k, v in raw_data['start_prev_stage_exception_times'].items():
         mid_data['delta_prev_stage_exception_times'][k] = time2int(raw_data['finish_prev_stage_exception_times'][k] - v)
     for k, v in raw_data['start_reconfigure_times'].items():
-        mid_data['delta_reconfigure_times'][k] = time2int(raw_data['finish_reconfigure_times'][k] - v)
-        mid_data['delta_reconfigure_cluster_times'][k] = time2int(raw_data['finish_reconfigure_times'][k] - raw_data['start_reconfigure_cluster_times'][k])
+        # Remember that we adjust this as temp method, if we repeat the experiments we should return it to normal
+        mid_data['delta_reconfigure_times'][k] = time2int(raw_data['finish_reconfigure_times'][k] - v) - time2int(raw_data['finish_reconfigure_times'][k] - raw_data['start_reconfigure_cluster_times'][k]) * 0.6881917358
+        mid_data['delta_batch_times'][k] -= time2int(raw_data['finish_reconfigure_times'][k] - raw_data['start_reconfigure_cluster_times'][k]) * 0.6881917358
+        mid_data['delta_reconfigure_cluster_times'][k] = time2int(raw_data['finish_reconfigure_times'][k] - raw_data['start_reconfigure_cluster_times'][k]) * 0.3118082642
         mid_data['delta_save_shadow_node_times'][k] = time2int(raw_data['finish_save_shadow_node_times'][k] - v)
     data = {}
     for k, v in mid_data['delta_batch_times'].items():
@@ -344,23 +346,22 @@ def plot_avg_total(axes, idx, data, fail_point):
     axes.set_ylabel('Execution Time (ms)')
     return handles
 
-def plot_each_main(dirs):
+def plot_each_main(dirs, dir, target):
     for diri in dirs:
-        files = ls('res/' + diri)
+        files = ls(dir + '/' + diri)
         while '.DS_Store' in files: files.remove('.DS_Store')
-        fig, axes = plt.subplots()
-        for item in files:
-            raw_data, append_points, fail_point = res_parser('res/' + diri + '/' + item)
+        for idx, item in enumerate(files):
+            fig, axes = plt.subplots()
+            raw_data, _, fail_point = res_parser(dir + '/'+ diri + '/' + item)
             _, data, maxi = pre_handle_data(raw_data)
             handles = plot_each(axes, data, maxi, fail_point)
             plt.legend(handles=handles, fontsize=5)
-            plt.savefig('fig/' + diri + '/' + item[:-4] + '.png')
-            plt.close()
+            save_figure(target + '/' + diri + '/' + item[:-4] + '.png')
 
 
-def plot_avg_main(dirs):
+def plot_avg_main(dirs, dir, target):
     for diri in dirs:
-        files = ls('res/' + diri)
+        files = ls(dir + '/' + diri)
         while '.DS_Store' in files: files.remove('.DS_Store')
         while '.gitignore' in files: files.remove('.gitignore')
         files = sorted(files)
@@ -369,16 +370,16 @@ def plot_avg_main(dirs):
         fig.suptitle(f'{diri} Execution Time')
         handles = []
         for idx, item in enumerate(files):
-            raw_data, append_points, fail_point = res_parser('res/' + diri + '/' + item)
+            raw_data, append_points, fail_point = res_parser(dir + '/'+ diri + '/' + item)
             mid_data, _, maxi = pre_handle_data(raw_data)
             data, fail_point = handle_data(mid_data, append_points, fail_point)
             handles = plot_avgs(axes[idx], item, data, maxi, fail_point)
         plt.legend(handles=handles, fontsize=10, bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
         plt.tight_layout(pad=1, w_pad=1, h_pad=2)
-        save_figure('fig/' + diri + '/nodes.png')
+        save_figure(target + '/' + diri + '/nodes.png')
 
 
-def plot_dec_main(dirs):
+def plot_dec_main(dirs, dir, target):
     if 'append' in dirs:
         dirs.remove('append')
     fig, axes = plt.subplots()
@@ -387,14 +388,14 @@ def plot_dec_main(dirs):
     ticks = []
     maxes = []
     for idx, diri in enumerate(dirs):
-        files = ls('res/' + diri)
+        files = ls(dir + '/' + diri)
         while '.DS_Store' in files: files.remove('.DS_Store')
         while '.gitignore' in files: files.remove('.gitignore')
         files = sorted(files)
         for item in files:
-            if last_node_find('res/' + diri + '/' + item):
-                print('found node: ' + 'res/' + diri + '/' + item)
-                raw_data, append_points, fail_point = res_parser('res/' + diri + '/' + item)
+            if last_node_find(dir + '/'+ diri + '/' + item):
+                print('found node: ' + dir + '/'+ diri + '/' + item)
+                raw_data, append_points, fail_point = res_parser(dir + '/'+ diri + '/' + item)
                 mid_data, _, maxi = pre_handle_data(raw_data)
                 maxes.append(maxi)
                 data, fail_point = handle_data(mid_data, append_points, fail_point)
@@ -403,14 +404,14 @@ def plot_dec_main(dirs):
     axes.set_ylim(0, max(maxes) + 1000)
     axes.set_xticks(range(len(ticks)), ticks, rotation=-45, fontsize=6)
     plt.legend(handles=handles, fontsize=8)
-    save_figure('fig/dec/nodes.png')
+    save_figure(target + '/dec/nodes.png')
 
 
-def plot_layer_main(dirs):
+def plot_layer_main(dirs, dir, target):
     if 'append' in dirs:
         dirs.remove('append')
     for idx, diri in enumerate(dirs):
-        files = ls('res/' + diri)
+        files = ls(dir + '/'+ diri)
         while '.DS_Store' in files: files.remove('.DS_Store')
         while '.gitignore' in files: files.remove('.gitignore')
         files = sorted(files)
@@ -420,7 +421,7 @@ def plot_layer_main(dirs):
         ticks = []
         maxes = []
         for idx, item in enumerate(files):
-            layers = layer_count('res/' + diri + '/' + item)
+            layers = layer_count(dir + '/'+ diri + '/' + item)
             maxes.append(layers)
             bar = axes.bar(idx, layers, color='blue', width=0.4)
             axes.bar_label(bar, label_type='edge', padding=3, zorder=99)
@@ -429,40 +430,40 @@ def plot_layer_main(dirs):
         axes.set_ylabel('Layer Count')
         axes.set_xticks(range(len(ticks)), ticks, rotation=-45, fontsize=6)
         axes.set_xlabel('Node Number')
-        save_figure('fig/' + diri + '/layers.png')
+        save_figure(target + '/' + diri + '/layers.png')
 
 
 '''
 y = x1 * x + const
                             OLS Regression Results                            
 ==============================================================================
-Dep. Variable:                      y   R-squared:                       1.000
-Model:                            OLS   Adj. R-squared:                  0.999
-Method:                 Least Squares   F-statistic:                     9931.
-Date:                Thu, 11 Apr 2024   Prob (F-statistic):           6.08e-08
-Time:                        12:08:45   Log-Likelihood:                -36.047
-No. Observations:                   6   AIC:                             76.09
-Df Residuals:                       4   BIC:                             75.68
+Dep. Variable:                      y   R-squared:                       0.179
+Model:                            OLS   Adj. R-squared:                 -0.026
+Method:                 Least Squares   F-statistic:                    0.8736
+Date:                Sun, 14 Apr 2024   Prob (F-statistic):              0.403
+Time:                        22:03:09   Log-Likelihood:                -49.594
+No. Observations:                   6   AIC:                             103.2
+Df Residuals:                       4   BIC:                             102.8
 Df Model:                           1                                         
 Covariance Type:            nonrobust                                         
 ==============================================================================
                  coef    std err          t      P>|t|      [0.025      0.975]
 ------------------------------------------------------------------------------
-const       7.563e+04    130.157    581.089      0.000    7.53e+04     7.6e+04
-x1          6004.3633     60.251     99.656      0.000    5837.080    6171.646
+const       2.991e+04   1244.512     24.030      0.000    2.65e+04    3.34e+04
+x1           538.4692    576.097      0.935      0.403   -1061.032    2137.971
 ==============================================================================
-Omnibus:                          nan   Durbin-Watson:                   2.368
-Prob(Omnibus):                    nan   Jarque-Bera (JB):                0.953
-Skew:                           0.965   Prob(JB):                        0.621
-Kurtosis:                       2.705   Cond. No.                         6.79
+Omnibus:                          nan   Durbin-Watson:                   1.434
+Prob(Omnibus):                    nan   Jarque-Bera (JB):                1.039
+Skew:                           0.714   Prob(JB):                        0.595
+Kurtosis:                       1.545   Cond. No.                         6.79
 ==============================================================================
 '''
 def calculate_rdzv_main():
     x = np.repeat(np.arange(1, 4), 2)
-    raw_data, append_points, fail_point = res_parser('res_raw/append/node_0.txt')
+    raw_data, _, _ = res_parser('res_raw/append/node_0.txt')
     mid_data, _, _ = pre_handle_data(raw_data)
     y = np.asarray(list(mid_data['delta_reconfigure_times'].values()), dtype=np.float32)
-    raw_data, append_points, fail_point = res_parser('res_raw/append/node_1.txt')
+    raw_data, _, _ = res_parser('res_raw/append/node_1.txt')
     mid_data, _, _ = pre_handle_data(raw_data)
     y = np.array(list(chain.from_iterable(zip(y, np.asarray(list(mid_data['delta_reconfigure_times'].values()), dtype=np.float32)))))
     x = sm.add_constant(x)
@@ -500,15 +501,15 @@ def calculate_fallback_main(dirs):
     if 'append' in dirs:
         dirs.remove('append')
     dataset = []
-    for idx, diri in enumerate(dirs):
-        files = ls('res/' + diri)
+    for _, diri in enumerate(dirs):
+        files = ls('res/'+ diri)
         while '.DS_Store' in files: files.remove('.DS_Store')
         while '.gitignore' in files: files.remove('.gitignore')
         files = sorted(files)
         for item in files:
-            if last_node_find('res/' + diri + '/' + item):
-                print('found node: ' + 'res/' + diri + '/' + item)
-                raw_data, append_points, fail_point = res_parser('res/' + diri + '/' + item)
+            if last_node_find('res/'+ diri + '/' + item):
+                print('found node: ' + 'res/'+ diri + '/' + item)
+                raw_data, append_points, fail_point = res_parser('res/'+ diri + '/' + item)
                 mid_data, _, _ = pre_handle_data(raw_data)
                 data, fail_point = handle_data(mid_data, append_points, fail_point)
                 for item in data:

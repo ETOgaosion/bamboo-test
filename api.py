@@ -12,6 +12,8 @@ def parse(args):
     parser.add_argument('--calculate-fallback', action='store_true')
     parser.add_argument('--calculate-pipeline-delta', action='store_true')
     parser.add_argument('--base-dir', type=str, default='test/bambootest/')
+    parser.add_argument('--dir', type=str, default='res')
+    parser.add_argument('--target', type=str, default='test/bambootest/fig')
     return parser.parse_args(args)
 
 def main(args):
@@ -20,21 +22,21 @@ def main(args):
 
     global base_dir
     base_dir = options.base_dir
-    dirs = sorted(os.listdir(base_dir + 'res'))
+    dirs = sorted(os.listdir(base_dir + options.dir))
     while '.DS_Store' in dirs: dirs.remove('.DS_Store')
     while '.gitignore' in dirs: dirs.remove('.gitignore')
 
     if options.plot_each:
-        plot_each_main(dirs)
+        plot_each_main(dirs, options.dir, options.target)
 
     if options.plot_avg:
-        plot_avg_main(dirs)
+        plot_avg_main(dirs, options.dir, options.target)
     
     if options.plot_dec:
-        plot_dec_main(dirs)
+        plot_dec_main(dirs, options.dir, options.target)
 
     if options.plot_layer:
-        plot_layer_main(dirs)
+        plot_layer_main(dirs, options.dir, options.target)
 
     if options.calculate_rdzv:
         calculate_rdzv_main()
