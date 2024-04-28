@@ -458,7 +458,7 @@ Skew:                           0.714   Prob(JB):                        0.595
 Kurtosis:                       1.545   Cond. No.                         6.79
 ==============================================================================
 '''
-def calculate_rdzv_main():
+def calculate_preparation_main():
     x = np.repeat(np.arange(1, 4), 2)
     raw_data, _, _ = res_parser('res_raw/append/node_0.txt')
     mid_data, _, _ = pre_handle_data(raw_data)
@@ -578,4 +578,4 @@ def res_parser_init():
     dirs = sorted(os.listdir(base_dir + 'res'))
     while '.DS_Store' in dirs: dirs.remove('.DS_Store')
     while '.gitignore' in dirs: dirs.remove('.gitignore')
-    return calculate_rdzv_main(), calculate_fallback_main(dirs), calculate_pipeline_delta()
+    return calculate_preparation_main(), calculate_fallback_main(dirs), calculate_pipeline_delta()

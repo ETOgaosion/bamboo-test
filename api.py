@@ -39,7 +39,7 @@ def main(args):
         plot_layer_main(dirs, options.dir, options.target)
 
     if options.calculate_rdzv:
-        calculate_rdzv_main()
+        calculate_preparation_main()
 
     if options.calculate_fallback:
         calculate_fallback_main(dirs)
